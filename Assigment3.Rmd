@@ -1,0 +1,350 @@
+---
+title: "Assignment3"
+author: "Rotem Shperling & Eitan Shteinberg"
+date: "December 22, 2017"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Read the data from the file
+library(igraph)
+
+ga.data <- read.csv('termDocMatrix\\ga_edgelist.csv', header = T)
+g <- graph.data.frame(ga.data,directed = F)
+```
+
+```{r}
+# Plot the initial graph
+plot(g, vertex.size=10, asp=FALSE)
+```
+
+
+```{r}
+# Calculate the max betweeness
+message("Max Betweeness\n")
+betweenness = betweenness(g)
+highest_bet = which.max(betweenness)
+betweenness[highest_bet]
+```
+
+```{r}
+# Calculate the max closeness
+message("Max Closeness\n")
+closeness = closeness(g)
+highest_clo = which.max(closeness)
+closeness[highest_clo]
+```
+
+
+```{r}
+# Calculate the max Eigen-vector
+message("Max EigenVector\n")
+eigen = eigen_centrality(g)
+list_eigen = eigen[1]
+highest_eig = which.max(as.numeric(unlist(list_eigen)))
+vec_eig = list_eigen[[1]]
+vec_eig[highest_eig]
+```
+
+
+Girvan-Newman community detection
+```{r}
+message("Girvan-Newman community detection")
+gc_gn =  edge.betweenness.community(g)
+```
+
+```{r}
+# Calculate the communities details
+memb_gn <- membership(gc_gn)
+df_gn = data.frame(sizes(gc_gn))
+colnames(df_gn) <- c("Community", "Size")
+df_gn
+```
+
+
+```{r}
+# Calculate the max modularity
+modularity_gn = gc_gn$modularity
+max_modularity_gn = max(modularity_gn)
+message("Modularity:\n")
+modularity_gn
+message("\nMax Modularity:\n")
+max_modularity_gn
+```
+
+```{r}
+# Plots the graph
+plot(g, vertex.size=12, vertex.label.font=6, vertex.label.cex=0.8, edge.width=2, vertex.color=memb_gn, asp=FALSE)
+```
+
+Walktrap community detection
+```{r}
+message("Walktrap community detection")
+gc_wt =  walktrap.community(g)
+```
+
+```{r}
+# Calculate the communities details
+memb_wt <- membership(gc_wt)
+df_wt = data.frame(sizes(gc_wt))
+colnames(df_wt) <- c("Community", "Size")
+df_wt
+```
+
+```{r}
+# Calculate the max modularity
+modularity_wt = gc_wt$modularity
+max_modularity_wt = max(modularity_wt)
+message("Modularity:\n")
+modularity_wt
+message("\nMax Modularity:\n")
+max_modularity_wt
+```
+
+```{r}
+# Plot the graph
+plot(g, vertex.size=12, vertex.label.font=6, vertex.label.cex=0.8, edge.width=2, vertex.color=memb_wt, asp=FALSE)
+```
+
+## Twitter Network Analysis
+In this assignment we will analyze the Twitter account of Eitan Shteinberg (@Eitansht) - one of the students.
+The process with gather the user details and then iterate over each of his friends.
+Each friend's details are kept and connections between the friends themselves are established.
+An initial graph will be plotted and then all the calculations will be applied using Walktrap algorithm.
+An analyzed colored, size factored graph of the sub-communities is plotted.
+
+### Data:
+Vertices  Friends (Twitter users)
+Edges     Friendship between users
+
+### Steps of implementation:
+1.  Get the keys from a a file (encapsulation)
+2.  Set the user we will analyze & max threshold friends of each other user
+3.  Start gathering information of all the friends & their friends, only those who have friends
+4.  Save the data to the disc (really long process because of Twitter's policy)
+5.  Load the data from the disc
+6.  Plot the initial graph with the user himself
+7.  Analyze the communities with Walktrap
+8.  Display max betweeness, closeness & eigen-vector
+9.  Display the community sizes
+10. Calculate max modularity
+11. Plot the analyzed graph with the sub-communities by color without the user
+
+### Usage:
+In this assignment we used the twitteR, igraph & rio packages.
+
+```{r}
+# Loading login details to a dataframe
+saved_df <- read.table("login_details.txt",header=FALSE)
+colnames(saved_df) <- c("Parameter", "Value")
+```
+
+
+```{r}
+# Assigning the login details to variables
+library(twitteR)
+library(igraph)
+library(rio)
+
+setup_twitter_oauth(
+  consumer_key=saved_df$Value[1], 
+  consumer_secret=saved_df$Value[2], 
+  access_token=saved_df$Value[3], 
+  access_secret=saved_df$Value[4]
+)
+```
+
+```{r}
+# Defining the Twitter account to analyze
+my.name <- "EitanSht"
+
+# Defining threshold of number of friends to each friend
+friends.threshold <- 5000
+```
+
+```{r}
+# # Extract user details, user's friends & followers
+# me <- getUser(my.name)
+# my.friends <- me$getFriends()
+# my.friends <- twListToDF(my.friends)
+# my.followers <- me$getFollowers()
+# my.followers <- twListToDF(my.followers)
+# 
+# # initialize data scraping
+# twitter.bubble <- data.frame(
+#   friend = my.friends$screenName,
+#   follower = my.name,
+#   N = me$followersCount,
+#   loc = me$location,
+#   stringsAsFactors = FALSE
+# )
+# 
+# skipped.friends <- NULL
+# 
+# # Loop over the friends
+# for (friend.name in my.friends$screenName) {
+#   # Get the friends data
+#   friend <- getUser(friend.name, retryOnRateLimit = 180)
+#   
+#   # Skip those that follow more than the threshold users
+#   if (friend$friendsCount > friends.threshold) {
+#     message(paste("*** skipping", friend.name, " (too many friends) ***"))
+#     skipped.friends <- append(skipped.friends, friend.name)
+#     next
+#   } else {
+#     message(friend.name)
+#   }
+#   
+#   # Get the friends of the friend
+#   friend.friends <- friend$getFriends(retryOnRateLimit = 180)
+#   
+#   # Evaluate only those that have any friends
+#   if (length(friend.friends) > 0) {
+#     friend.friends <- twListToDF(friend.friends)
+#     
+#     # Insert a connection for those friends that are also in the user's friends
+#     common.friends <-
+#       intersect(c(my.friends$screenName, my.name),
+#                 friend.friends$screenName)
+#     if (length(common.friends) > 0)
+#       twitter.bubble <- rbind(
+#         twitter.bubble,
+#         data.frame(
+#           friend = common.friends,
+#           follower = friend.name,
+#           N = friend$followersCount,
+#           loc = friend$location,
+#           stringsAsFactors = FALSE
+#         )
+#       )
+#   }
+# }
+```
+
+```{r}
+# # Dataframe for the colors
+# followersCount <- twitter.bubble[!duplicated(twitter.bubble[, c(2,3)]), c(2,3)]
+# 
+# # Include those not evaluated so far due to too many friends
+# for (friend.name in setdiff(my.friends$screenName, followersCount$follower)) {
+#   friend <- getUser(friend.name, retryOnRateLimit=180)
+#   followersCount <- rbind(followersCount, data.frame(follower=friend.name, N=friend$followersCount), stringsAsFactors=FALSE)
+# }
+# 
+# # Save the variables to disc
+# save(file=paste("twitter_eitan", format(Sys.time(), "%Y%m%d"),".RData", sep=""), my.name, my.friends, twitter.bubble, skipped.friends, followersCount)
+```
+
+```{r}
+# Load the variables from the disc
+library(viridis)
+
+load("twitter_eitan.RData")
+```
+
+```{r, fig.width=20, fig.height=16}
+# Plot all the raw data
+g <- graph.edgelist(as.matrix(twitter.bubble[, c(1, 2)]), directed = FALSE)
+
+# Plot's layout
+layout <-
+  layout_with_lgl(
+    g,
+    maxiter = 1000,
+    area = length(V(g)) ^ 3.5,
+    repulserad = length(V(g)) ^ 5.5
+  )
+
+# Draw the plot
+plot(
+  g,
+  layout = layout,
+  # vertex.label="",
+  vertex.size = 0.1 + 0.75 * sqrt(graph.strength(g)),
+  edge.width = 0.01,
+  asp = 9 / 16,
+  margin = -0.1
+)
+```
+
+```{r}
+# Communities analysis with removing the dedicated user
+twitter.bubble <- subset(twitter.bubble, friend!=my.name & follower!=my.name)
+
+# Walktrap communities analysis
+message("Walktrap community detection")
+g_twitter <- graph.edgelist(as.matrix(twitter.bubble[,c(1,2)]), directed=FALSE)
+E(g_twitter)$weight <- edge.betweenness(g_twitter)
+gc_wt <- walktrap.community(g_twitter, steps=31)
+message("Communities\n")
+print(communities(gc_wt))
+```
+
+```{r}
+# Calculate the max betweeness
+message("Max Betweeness\n")
+betweenness = betweenness(g_twitter)
+highest_bet = which.max(betweenness)
+betweenness[highest_bet]
+```
+
+```{r}
+# Calculate the max closeness
+message("Max Closeness\n")
+closeness = closeness(g_twitter)
+highest_clo = which.max(closeness)
+closeness[highest_clo]
+```
+
+
+```{r}
+# Calculate the max eigen-vector
+message("Max EigenVector\n")
+eigen = eigen_centrality(g_twitter)
+list_eigen = eigen[1]
+highest_eig = which.max(as.numeric(unlist(list_eigen)))
+vec_eig = list_eigen[[1]]
+vec_eig[highest_eig]
+```
+
+
+```{r}
+# Communities details
+memb_wt <- membership(gc_wt)
+message("Number of communities: ", length(sizes(gc_wt)))
+df_wt = data.frame(sizes(gc_wt))
+colnames(df_wt) <- c("Community", "Size")
+df_wt
+```
+
+```{r}
+# Max modularity
+modularity_wt = gc_wt$modularity
+max_modularity_wt = max(modularity_wt)
+message("Modularity:\n")
+modularity_wt
+message("\nMax Modularity:\n")
+max_modularity_wt
+```
+
+```{r, fig.width=14, fig.height=10}
+# Plot the communities graph
+par(bg="lightgray")
+V(g_twitter)$label.cex = 0.1 + 0.08 * sqrt(graph.strength(g_twitter))
+plot(
+  g_twitter,
+  layout = layout,
+  vertex.size = 0.1 + 0.75 * sqrt(graph.strength(g_twitter)),
+  vertex.color = memb_wt,
+  edge.width = 0.01,
+  asp = 9 / 16,
+  margin = -0.1
+)
+```
