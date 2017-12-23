@@ -1,3 +1,5 @@
+# Data Collection & Network Analysis - Assignment 3
+
 ``` r
 # Read the data from the file
 library(igraph)
